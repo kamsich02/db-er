@@ -21,16 +21,27 @@ const pool = new Pool({
   },
 });
 
+
 app.post('/api/wallet', async (req, res) => {
   const { address, balance, withdrawable } = req.body;
   try {
-    await pool.query('INSERT INTO wallets (address, walletbalance, totalwithdrawable) VALUES ($1, $2, $3)', [address, balance, withdrawable]);
-    res.json({ message: 'Data inserted successfully' });
+    const result = await pool.query('SELECT * FROM wallets WHERE address = $1', [address]);
+    
+    if (result.rows.length > 0) {
+      // Wallet address exists, update the record
+      await pool.query('UPDATE wallets SET walletbalance = $1, totalwithdrawable = $2 WHERE address = $3', [balance, withdrawable, address]);
+      res.json({ message: 'Data updated successfully' });
+    } else {
+      // Wallet address doesn't exist, insert a new record
+      await pool.query('INSERT INTO wallets (address, walletbalance, totalwithdrawable) VALUES ($1, $2, $3)', [address, balance, withdrawable]);
+      res.json({ message: 'Data inserted successfully' });
+    }
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Internal server error' });
   }
 });
+
 
 app.get('/api/wallet/:walletAddress', async (req, res) => {
     const { walletAddress } = req.params;
