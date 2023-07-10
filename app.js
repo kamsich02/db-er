@@ -9,6 +9,7 @@ const port = 3009;
 
 app.use(cors());
 app.use(bodyParser.json());
+app.use(bodyParser.urlencoded({ extended: true }));
 
 const pool = new Pool({
   host: process.env.DB_HOST,
@@ -57,6 +58,59 @@ app.get('/api/wallet/:walletAddress', async (req, res) => {
       res.status(500).json({ message: 'Internal server error' });
     }
   });
+
+// Define the /api/transactions endpoint
+app.get('/api/transactions', async (req, res) => {
+  try {
+      const walletAddress = req.query.walletAddress;
+      
+      // Query to get transactions for a specific wallet
+      const query = `
+          SELECT * FROM transactions 
+          WHERE wallet_address = $1
+          ORDER BY timestamp DESC;
+      `;
+      
+      // Execute the query
+      const { rows } = await pool.query(query, [walletAddress]);
+      
+      // Send the rows as the response
+      res.json(rows);
+  } catch (error) {
+      console.error(`Error in API: ${error.message}`);
+      res.status(500).json({ error: 'An error occurred while fetching transactions' });
+  }
+});
+
+app.post('/api/transactions', async (req, res) => {
+  const { wallet_address, status, type, value } = req.body;
+  try {
+    await pool.query(
+      'INSERT INTO transactions (timestamp, wallet_address, status, type, value) VALUES (CURRENT_TIMESTAMP, $1, $2, $3, $4)',
+      [wallet_address, status, type, value]
+    );
+    res.json({ message: 'Transaction added successfully' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
+app.put('/api/transactions', async (req, res) => {
+  const { timestamp, wallet_address, status, type, value } = req.body;
+  try {
+    await pool.query(
+      'UPDATE transactions SET status = $1, type = $2, value = $3 WHERE timestamp = $4 AND wallet_address = $5',
+      [status, type, value, timestamp, wallet_address]
+    );
+    res.json({ message: 'Transaction updated successfully' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
+
   
 
 app.listen(port, () => {
