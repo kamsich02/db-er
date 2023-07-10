@@ -22,19 +22,26 @@ const pool = new Pool({
   },
 });
 
-
 app.post('/api/wallet', async (req, res) => {
   const { address, balance, withdrawable } = req.body;
   try {
     const result = await pool.query('SELECT * FROM wallets WHERE address = $1', [address]);
-    
+
     if (result.rows.length > 0) {
       // Wallet address exists, update the record
-      await pool.query('UPDATE wallets SET walletbalance = $1, totalwithdrawable = $2 WHERE address = $3', [balance, withdrawable, address]);
+      await pool.query('UPDATE wallets SET walletbalance = $1, totalwithdrawable = $2 WHERE address = $3', [
+        balance,
+        withdrawable,
+        address
+      ]);
       res.json({ message: 'Data updated successfully' });
     } else {
       // Wallet address doesn't exist, insert a new record
-      await pool.query('INSERT INTO wallets (address, walletbalance, totalwithdrawable) VALUES ($1, $2, $3)', [address, balance, withdrawable]);
+      await pool.query('INSERT INTO wallets (address, walletbalance, totalwithdrawable) VALUES ($1, $2, $3)', [
+        address,
+        balance,
+        withdrawable
+      ]);
       res.json({ message: 'Data inserted successfully' });
     }
   } catch (err) {
@@ -43,42 +50,38 @@ app.post('/api/wallet', async (req, res) => {
   }
 });
 
-
 app.get('/api/wallet/:walletAddress', async (req, res) => {
-    const { walletAddress } = req.params;
-    try {
-      const result = await pool.query('SELECT * FROM wallets WHERE address = $1', [walletAddress]);
-      if (result.rows.length > 0) {
-        res.json(result.rows[0]);
-      } else {
-        res.status(404).json({ message: 'Wallet not found' });
-      }
-    } catch (err) {
-      console.error(err);
-      res.status(500).json({ message: 'Internal server error' });
+  const { walletAddress } = req.params;
+  try {
+    const result = await pool.query('SELECT * FROM wallets WHERE address = $1', [walletAddress]);
+    if (result.rows.length > 0) {
+      res.json(result.rows[0]);
+    } else {
+      res.status(404).json({ message: 'Wallet not found' });
     }
-  });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
 
-// Define the /api/transactions endpoint
 app.get('/api/transactions', async (req, res) => {
   try {
-      const walletAddress = req.query.walletAddress;
-      
-      // Query to get transactions for a specific wallet
-      const query = `
-          SELECT * FROM transactions 
-          WHERE wallet_address = $1
-          ORDER BY timestamp DESC;
-      `;
-      
-      // Execute the query
-      const { rows } = await pool.query(query, [walletAddress]);
-      
-      // Send the rows as the response
-      res.json(rows);
+    const walletAddress = req.query.walletAddress;
+
+    // Query to get transactions for a specific wallet
+    const query = `
+        SELECT * FROM transactions 
+        WHERE wallet_address = $1
+        ORDER BY timestamp DESC;
+    `;
+
+    const { rows } = await pool.query(query, [walletAddress]);
+
+    res.json(rows);
   } catch (error) {
-      console.error(`Error in API: ${error.message}`);
-      res.status(500).json({ error: 'An error occurred while fetching transactions' });
+    console.error(`Error in API: ${error.message}`);
+    res.status(500).json({ error: 'An error occurred while fetching transactions' });
   }
 });
 
@@ -86,7 +89,7 @@ app.post('/api/transactions', async (req, res) => {
   const { wallet_address, status, type, value } = req.body;
   try {
     await pool.query(
-      'INSERT INTO transactions (timestamp, wallet_address, status, type, value) VALUES (CURRENT_TIMESTAMP, $1, $2, $3, $4)',
+      'INSERT INTO transactions (id, wallet_address, status, type, value) VALUES (DEFAULT, $1, $2, $3, $4)',
       [wallet_address, status, type, value]
     );
     res.json({ message: 'Transaction added successfully' });
@@ -97,11 +100,11 @@ app.post('/api/transactions', async (req, res) => {
 });
 
 app.put('/api/transactions', async (req, res) => {
-  const { timestamp, wallet_address, status, type, value } = req.body;
+  const { id, wallet_address, status, type, value } = req.body;
   try {
     await pool.query(
-      'UPDATE transactions SET status = $1, type = $2, value = $3 WHERE timestamp = $4 AND wallet_address = $5',
-      [status, type, value, timestamp, wallet_address]
+      'UPDATE transactions SET status = $1, type = $2, value = $3 WHERE id = $4 AND wallet_address = $5',
+      [status, type, value, id, wallet_address]
     );
     res.json({ message: 'Transaction updated successfully' });
   } catch (err) {
@@ -109,9 +112,6 @@ app.put('/api/transactions', async (req, res) => {
     res.status(500).json({ message: 'Internal server error' });
   }
 });
-
-
-  
 
 app.listen(port, () => {
   console.log(`Server running at http://localhost:${port}`);
