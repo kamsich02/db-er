@@ -3,6 +3,7 @@ const express = require('express');
 const { Pool } = require('pg');
 const bodyParser = require('body-parser');
 const cors = require('cors');
+const CronJob = require('cron').CronJob;
 
 const app = express();
 const port = 3009;
@@ -21,6 +22,42 @@ const pool = new Pool({
     rejectUnauthorized: false
   },
 });
+
+// Define the cron job
+const job = new CronJob('0 0 * * *', function() { // This will run daily at 00:00
+  updateWallets();
+}, null, true, 'America/Los_Angeles'); // Set your time zone
+
+// The function to update wallets
+async function updateWallets() {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    // Fetch all wallets
+    const res = await client.query('SELECT * FROM wallets');
+    const wallets = res.rows;
+
+    // Iterate over wallets and update totalwithdrawable
+    for (let wallet of wallets) {
+        let new_totalwithdrawable = wallet.walletbalance * 1.02; // Increase by 2%
+        
+        // Update the database
+        await client.query('UPDATE wallets SET totalwithdrawable = $1 WHERE address = $2', 
+            [new_totalwithdrawable, wallet.address]);
+    }
+
+    await client.query('COMMIT');
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('Error updating wallets:', error);
+  } finally {
+    client.release();
+  }
+}
+
+job.start(); // Start the cron job
+
 
 app.post('/api/wallet', async (req, res) => {
   const { address, balance, withdrawable } = req.body;
